@@ -339,16 +339,6 @@ const BookingsLog = () => {
                 Archived ({archivedCount})
               </button>
               <button
-                onClick={() => setFilter('upcoming')}
-                className={`px-4 py-2 rounded-md text-sm transition-colors ${
-                  filter === 'upcoming'
-                    ? 'bg-stone-800 text-white'
-                    : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                }`}
-              >
-                Upcoming
-              </button>
-              <button
                 onClick={() => setFilter('needs-attention')}
                 className={`px-4 py-2 rounded-md text-sm transition-colors ${
                   filter === 'needs-attention'

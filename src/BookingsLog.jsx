@@ -185,25 +185,18 @@ const BookingsLog = () => {
       return eventDate >= today && !b.completed;
     }
     if (filter === 'needs-attention') {
-      const hasIncompleteItems = !b.insuranceReceived ||
-             !b.questionnaireReceived || !b.photoPermission || !b.posted ||
-             (b.type === 'Wedding' && !b.brickWordingReceived);
       const isWithinThreeMonths = eventDate <= threeMonthsOut && eventDate >= today;
-      return (hasIncompleteItems || isWithinThreeMonths) && !b.completed;
+      return isWithinThreeMonths && !b.completed;
     }
     if (filter === 'button-this-up') {
       const isWithinOneMonth = eventDate <= oneMonthOut && eventDate >= today;
-      const hasIncompleteItems = !b.insuranceReceived ||
-             !b.questionnaireReceived || !b.photoPermission || !b.posted ||
-             (b.type === 'Wedding' && !b.brickWordingReceived);
-      return isWithinOneMonth && hasIncompleteItems && !b.completed;
+      return isWithinOneMonth && !b.completed;
     }
     if (filter === 'finalized') {
-      const isWithinOneMonth = eventDate <= oneMonthOut && eventDate >= today;
       const allComplete = b.insuranceReceived &&
              b.questionnaireReceived && b.photoPermission && b.posted &&
              (b.type !== 'Wedding' || b.brickWordingReceived);
-      return isWithinOneMonth && allComplete && !b.completed;
+      return allComplete && !b.completed;
     }
     if (filter === 'Wedding' || filter === 'Private Party' || filter === 'Non-Profit') {
       return b.type === filter && !b.completed;
@@ -240,29 +233,21 @@ const BookingsLog = () => {
 
   const needsAttentionCount = bookings.filter(b => {
     const eventDate = parseDate(b.date);
-    const hasIncompleteItems = !b.insuranceReceived ||
-           !b.questionnaireReceived || !b.photoPermission || !b.posted ||
-           (b.type === 'Wedding' && !b.brickWordingReceived);
     const isWithinThreeMonths = eventDate <= threeMonthsOut && eventDate >= today;
-    return (hasIncompleteItems || isWithinThreeMonths) && !b.completed;
+    return isWithinThreeMonths && !b.completed;
   }).length;
 
   const buttonThisUpCount = bookings.filter(b => {
     const eventDate = parseDate(b.date);
     const isWithinOneMonth = eventDate <= oneMonthOut && eventDate >= today;
-    const hasIncompleteItems = !b.insuranceReceived ||
-           !b.questionnaireReceived || !b.photoPermission || !b.posted ||
-           (b.type === 'Wedding' && !b.brickWordingReceived);
-    return isWithinOneMonth && hasIncompleteItems && !b.completed;
+    return isWithinOneMonth && !b.completed;
   }).length;
 
   const finalizedCount = bookings.filter(b => {
-    const eventDate = parseDate(b.date);
-    const isWithinOneMonth = eventDate <= oneMonthOut && eventDate >= today;
     const allComplete = b.insuranceReceived &&
            b.questionnaireReceived && b.photoPermission && b.posted &&
            (b.type !== 'Wedding' || b.brickWordingReceived);
-    return isWithinOneMonth && allComplete && !b.completed;
+    return allComplete && !b.completed;
   }).length;
 
   return (

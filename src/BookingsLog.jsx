@@ -194,7 +194,7 @@ const BookingsLog = () => {
     }
     if (filter === 'finalized') {
       const allComplete = b.insuranceReceived &&
-             b.questionnaireReceived && b.photoPermission && b.posted &&
+             b.questionnaireReceived && b.photoPermission &&
              (b.type !== 'Wedding' || b.brickWordingReceived);
       return allComplete && !b.completed;
     }
@@ -245,7 +245,7 @@ const BookingsLog = () => {
 
   const finalizedCount = bookings.filter(b => {
     const allComplete = b.insuranceReceived &&
-           b.questionnaireReceived && b.photoPermission && b.posted &&
+           b.questionnaireReceived && b.photoPermission &&
            (b.type !== 'Wedding' || b.brickWordingReceived);
     return allComplete && !b.completed;
   }).length;
@@ -491,19 +491,6 @@ const BookingsLog = () => {
                     <span className="text-sm text-stone-700">Photo Permission</span>
                   </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <div
-                      onClick={() => toggleCheckbox(booking.id, 'posted')}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                        booking.posted
-                          ? 'bg-stone-800 border-stone-800'
-                          : 'border-stone-300 group-hover:border-stone-400'
-                      }`}
-                    >
-                      {booking.posted && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    <span className="text-sm text-stone-700">Posted</span>
-                  </label>
                 </div>
 
                 {/* Text Fields */}
@@ -540,19 +527,47 @@ const BookingsLog = () => {
                           className="w-full px-3 py-2 border border-stone-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-stone-400"
                         />
                       </div>
+                      <label className="flex items-center gap-2 cursor-pointer group">
+                        <div
+                          onClick={() => toggleCheckbox(booking.id, 'posted')}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                            booking.posted
+                              ? 'bg-stone-800 border-stone-800'
+                              : 'border-stone-300 group-hover:border-stone-400'
+                          }`}
+                        >
+                          {booking.posted && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <span className="text-sm text-stone-700">Posted</span>
+                      </label>
                     </>
                   )}
                   {booking.type !== 'Wedding' && (
-                    <div className="md:col-span-2">
-                      <label className="block text-xs text-stone-600 mb-1">Photographer Link</label>
-                      <input
-                        type="text"
-                        value={booking.photographerLink}
-                        onChange={(e) => updateField(booking.id, 'photographerLink', e.target.value)}
-                        placeholder="Enter link..."
-                        className="w-full px-3 py-2 border border-stone-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-stone-400"
-                      />
-                    </div>
+                    <>
+                      <div>
+                        <label className="block text-xs text-stone-600 mb-1">Photographer Link</label>
+                        <input
+                          type="text"
+                          value={booking.photographerLink}
+                          onChange={(e) => updateField(booking.id, 'photographerLink', e.target.value)}
+                          placeholder="Enter link..."
+                          className="w-full px-3 py-2 border border-stone-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-stone-400"
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer group md:items-start md:pt-5">
+                        <div
+                          onClick={() => toggleCheckbox(booking.id, 'posted')}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                            booking.posted
+                              ? 'bg-stone-800 border-stone-800'
+                              : 'border-stone-300 group-hover:border-stone-400'
+                          }`}
+                        >
+                          {booking.posted && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <span className="text-sm text-stone-700">Posted</span>
+                      </label>
+                    </>
                   )}
                 </div>
               </div>

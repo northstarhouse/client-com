@@ -283,7 +283,7 @@ const BookingsLog = () => {
         {/* Header */}
         <div className="mb-8 flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-light mb-2 font-cardo text-[#886c44]">North Star House</h1>
+            <h1 className="text-3xl font-bold mb-2 font-cardo text-[#886c44]">North Star House</h1>
             <p className="text-stone-600">Bookings Log</p>
           </div>
           <div className="flex items-center gap-3">

@@ -1,8 +1,8 @@
-import BookingsLog from './BookingsLog'
+import ClientMessageTracker from './ClientMessageTracker'
 import './index.css'
 
 function App() {
-  return <BookingsLog />
+  return <ClientMessageTracker />
 }
 
 export default App

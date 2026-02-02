@@ -143,11 +143,26 @@ const BookingsLog = () => {
   };
 
   const parseDate = (dateStr) => {
+    if (!dateStr) return new Date('');
+    // Handle ISO strings from Sheets (e.g., 2026-11-07T08:00:00.000Z)
+    if (dateStr.includes('T')) {
+      const iso = new Date(dateStr);
+      return iso;
+    }
     const [month, day, year] = dateStr.split('/');
     return new Date(year, month - 1, day);
   };
 
   const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    if (dateStr.includes('T')) {
+      const iso = new Date(dateStr);
+      if (Number.isNaN(iso.getTime())) return '';
+      const mm = String(iso.getMonth() + 1).padStart(2, '0');
+      const dd = String(iso.getDate()).padStart(2, '0');
+      const yyyy = String(iso.getFullYear()).padStart(4, '0');
+      return `${mm}-${dd}-${yyyy}`;
+    }
     const [month, day, year] = dateStr.split('/');
     const mm = String(month || '').padStart(2, '0');
     const dd = String(day || '').padStart(2, '0');

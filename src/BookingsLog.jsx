@@ -238,14 +238,7 @@ const BookingsLog = () => {
     }
   };
 
-  const getTypeBorderColor = (type) => {
-    switch(type) {
-      case 'Wedding': return '#886c44';
-      case 'Private Party': return '#1e3a8a';
-      case 'Non-Profit': return '#991b1b';
-      default: return '#d4d4d4';
-    }
-  };
+  const getTypeBorderColor = () => '#886c44';
 
   const activeCount = bookings.filter(b => !b.completed).length;
   const archivedCount = bookings.filter(b => b.completed).length;

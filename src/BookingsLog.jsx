@@ -497,25 +497,32 @@ const BookingsLog = () => {
                 <div className="grid md:grid-cols-2 gap-3">
                   {booking.type === 'Wedding' && (
                     <>
-                      <div className="md:col-span-2">
+                      <div>
                         <label className="block text-xs text-stone-600 mb-1">Wording</label>
                         <textarea
                           value={booking.wording}
                           onChange={(e) => updateField(booking.id, 'wording', e.target.value)}
-                          placeholder="Enter brick wording..."
+                          placeholder="Max 3 lines, 20 chars each"
                           rows="3"
+                          maxLength={60}
                           className="w-full px-3 py-2 border border-stone-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-stone-400"
                         />
+                        <p className="mt-1 text-[11px] text-stone-500">
+                          {60 - (booking.wording?.length || 0)} characters left
+                        </p>
                       </div>
                       <div>
                         <label className="block text-xs text-stone-600 mb-1">Order Status</label>
-                        <input
-                          type="text"
+                        <select
                           value={booking.orderStatus}
                           onChange={(e) => updateField(booking.id, 'orderStatus', e.target.value)}
-                          placeholder="Enter status..."
-                          className="w-full px-3 py-2 border border-stone-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-stone-400"
-                        />
+                          className="w-full px-3 py-2 border border-stone-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-stone-400"
+                        >
+                          <option value="">Select status...</option>
+                          <option value="Ordered">Ordered</option>
+                          <option value="Received">Received</option>
+                          <option value="Set in the ground">Set in the ground</option>
+                        </select>
                       </div>
                       <div>
                         <label className="block text-xs text-stone-600 mb-1">Photographer Link</label>

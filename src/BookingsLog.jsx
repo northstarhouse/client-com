@@ -43,6 +43,7 @@ const defaultBookings = [
   questionnaireReceived: false,
   photoPermission: false,
   photographerLink: "",
+  projectLink: "",
   posted: false,
   completed: false
 }));
@@ -55,6 +56,17 @@ const BookingsLog = () => {
   const [syncStatus, setSyncStatus] = useState('');
   const saveTimeoutRef = useRef(null);
 
+  const normalizeBookings = (list) =>
+    list.map((b) => ({
+      ...b,
+      projectLink: b.projectLink || b['Project Link'] || '',
+    }));
+
+  const mapBookingForSave = (b) => ({
+    ...b,
+    'Project Link': b.projectLink || b['Project Link'] || '',
+  });
+
   // Load bookings from Google Sheets
   const loadBookings = useCallback(async () => {
     setLoading(true);
@@ -63,7 +75,7 @@ const BookingsLog = () => {
       const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getBookings`);
       const data = await response.json();
       if (data.success && data.bookings && data.bookings.length > 0) {
-        setBookings(data.bookings);
+        setBookings(normalizeBookings(data.bookings));
         setSyncStatus('Synced');
       } else if (data.success && (!data.bookings || data.bookings.length === 0)) {
         // No data in sheet yet, seed it with defaults
@@ -91,7 +103,10 @@ const BookingsLog = () => {
     try {
       const response = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'saveAllBookings', bookings: bookingsToSave }),
+        body: JSON.stringify({
+          action: 'saveAllBookings',
+          bookings: bookingsToSave.map(mapBookingForSave),
+        }),
       });
       const data = await response.json();
       if (data.success) {
@@ -414,6 +429,16 @@ const BookingsLog = () => {
                     <p className="text-sm text-stone-600 mt-1">{formatDate(booking.date)}</p>
                     {booking.client1 && (
                       <p className="text-xs text-stone-500 mt-1">{booking.client1}</p>
+                    )}
+                    {booking.projectLink && (
+                      <a
+                        href={booking.projectLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex mt-2 text-xs font-medium text-stone-700 underline decoration-stone-400 underline-offset-2 hover:text-stone-900"
+                      >
+                        Project Link
+                      </a>
                     )}
                   </div>
                   <div className="flex items-center gap-2">

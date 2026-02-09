@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Check, Archive, RefreshCw, Save } from 'lucide-react';
+import { Check, Archive, RefreshCw, Save, Trash2 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvi0OZXNzKNXrfN4HHwsR1kzwwZeq5HvTnyic2GKzXN9_Fx2O_AFCuj6izIAIhdg5t/exec';
+const SUPABASE_TABLE = 'bookings';
+const SUPABASE_BACKUP_TABLE = 'bookings_backup';
+const HONEYBOOK_MESSAGES_URL = 'https://docs.google.com/spreadsheets/d/1l-FsSLYELMM5pMwWS92UgKlwPmsrCmNEe7kmrEaQB6M/edit?usp=sharing';
+const HONEYBOOK_MESSAGES_EMBED_URL = 'https://docs.google.com/spreadsheets/d/1l-FsSLYELMM5pMwWS92UgKlwPmsrCmNEe7kmrEaQB6M/preview';
 
 const defaultBookings = [
   { id: 1, name: "Korrie Peterson & Seann Wedding", type: "Wedding", date: "11/7/2026", client1: "Korrie Peterson", client2: "Katie Klouda" },
@@ -54,7 +59,10 @@ const BookingsLog = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncStatus, setSyncStatus] = useState('');
+  const [view, setView] = useState('bookings');
   const saveTimeoutRef = useRef(null);
+  const supabaseEnabled = Boolean(supabase);
+  const dataSourceLabel = supabaseEnabled ? 'Supabase' : 'Google Sheets';
 
   const normalizeBookings = (list) =>
     list.map((b) => {
@@ -77,37 +85,78 @@ const BookingsLog = () => {
     id: String(b.name || b.id || ''),
   });
 
-  // Load bookings from Google Sheets
-  const loadBookings = useCallback(async () => {
-    setLoading(true);
-    setSyncStatus('Loading...');
+  const mapBookingForSupabase = (b) => ({
+    id: String(b.id || b.name || ''),
+    name: b.name || '',
+    type: b.type || '',
+    date: b.date || '',
+    client1: b.client1 || '',
+    client2: b.client2 || '',
+    brickWordingReceived: Boolean(b.brickWordingReceived),
+    wording: b.wording || '',
+    orderStatus: b.orderStatus || '',
+    insuranceReceived: Boolean(b.insuranceReceived),
+    questionnaireReceived: Boolean(b.questionnaireReceived),
+    photoPermission: Boolean(b.photoPermission),
+    photographerLink: b.photographerLink || '',
+    projectLink: b.projectLink || '',
+    posted: Boolean(b.posted),
+    completed: Boolean(b.completed),
+  });
+
+  const mapBookingForBackup = (b) => ({
+    original_id: String(b.id || b.name || ''),
+    name: b.name || '',
+    type: b.type || '',
+    date: b.date || '',
+    client1: b.client1 || '',
+    client2: b.client2 || '',
+    brickWordingReceived: Boolean(b.brickWordingReceived),
+    wording: b.wording || '',
+    orderStatus: b.orderStatus || '',
+    insuranceReceived: Boolean(b.insuranceReceived),
+    questionnaireReceived: Boolean(b.questionnaireReceived),
+    photoPermission: Boolean(b.photoPermission),
+    photographerLink: b.photographerLink || '',
+    projectLink: b.projectLink || '',
+    posted: Boolean(b.posted),
+    completed: Boolean(b.completed),
+    duplicated_at: new Date().toISOString(),
+  });
+
+  const saveAllToSupabase = useCallback(async (bookingsToSave) => {
+    setSaving(true);
+    setSyncStatus('Saving...');
     try {
-      const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getBookings`);
-      const data = await response.json();
-      if (data.success && data.bookings && data.bookings.length > 0) {
-        setBookings(normalizeBookings(data.bookings));
-        setSyncStatus('Synced');
-      } else if (data.success && (!data.bookings || data.bookings.length === 0)) {
-        // No data in sheet yet, seed it with defaults
-        setBookings(defaultBookings);
-        setSyncStatus('Initialized with defaults');
-        await saveAllToSheet(defaultBookings);
+      const payload = bookingsToSave.map(mapBookingForSupabase);
+      const { error } = await supabase
+        .from(SUPABASE_TABLE)
+        .upsert(payload, { onConflict: 'id' });
+
+      if (error) {
+        throw error;
+      }
+
+      const backupPayload = bookingsToSave.map(mapBookingForBackup);
+      const { error: backupError } = await supabase
+        .from(SUPABASE_BACKUP_TABLE)
+        .insert(backupPayload);
+
+      if (backupError) {
+        console.warn('Supabase backup insert failed:', backupError);
+        setSyncStatus('Saved (backup skipped)');
       } else {
-        setSyncStatus('Load failed');
+        setSyncStatus('Saved (backup duplicated)');
       }
     } catch (err) {
-      console.error('Failed to load bookings:', err);
-      setSyncStatus('Offline');
+      console.error('Failed to save bookings to Supabase:', err);
+      setSyncStatus('Save failed');
     }
-    setLoading(false);
+    setSaving(false);
   }, []);
 
-  useEffect(() => {
-    loadBookings();
-  }, [loadBookings]);
-
   // Save all bookings to sheet
-  const saveAllToSheet = async (bookingsToSave) => {
+  const saveAllToSheet = useCallback(async (bookingsToSave) => {
     setSaving(true);
     setSyncStatus('Saving...');
     try {
@@ -129,7 +178,59 @@ const BookingsLog = () => {
       setSyncStatus('Save failed');
     }
     setSaving(false);
-  };
+  }, []);
+
+  const saveAll = useCallback(async (bookingsToSave) => {
+    if (supabaseEnabled) {
+      await saveAllToSupabase(bookingsToSave);
+      return;
+    }
+    await saveAllToSheet(bookingsToSave);
+  }, [supabaseEnabled, saveAllToSupabase, saveAllToSheet]);
+
+  // Load bookings from Supabase (primary) or Google Sheets (fallback)
+  const loadBookings = useCallback(async () => {
+    setLoading(true);
+    setSyncStatus('Loading...');
+    try {
+      if (supabaseEnabled) {
+        const { data, error } = await supabase.from(SUPABASE_TABLE).select('*');
+        if (error) {
+          throw error;
+        }
+        if (data && data.length > 0) {
+          setBookings(normalizeBookings(data));
+          setSyncStatus('Synced');
+        } else {
+          setBookings(defaultBookings);
+          setSyncStatus('Seeded Supabase');
+          await saveAll(defaultBookings);
+        }
+      } else {
+        const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getBookings`);
+        const data = await response.json();
+        if (data.success && data.bookings && data.bookings.length > 0) {
+          setBookings(normalizeBookings(data.bookings));
+          setSyncStatus('Synced');
+        } else if (data.success && (!data.bookings || data.bookings.length === 0)) {
+          // No data in sheet yet, seed it with defaults
+          setBookings(defaultBookings);
+          setSyncStatus('Initialized with defaults');
+          await saveAll(defaultBookings);
+        } else {
+          setSyncStatus('Load failed');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load bookings:', err);
+      setSyncStatus(supabaseEnabled ? 'Supabase error' : 'Offline');
+    }
+    setLoading(false);
+  }, [supabaseEnabled, saveAll]);
+
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
 
   // Auto-save with debounce
   const debouncedSave = useCallback((updatedBookings) => {
@@ -137,9 +238,9 @@ const BookingsLog = () => {
       clearTimeout(saveTimeoutRef.current);
     }
     saveTimeoutRef.current = setTimeout(() => {
-      saveAllToSheet(updatedBookings);
+      saveAll(updatedBookings);
     }, 2000);
-  }, []);
+  }, [saveAll]);
 
   const updateBookings = (updatedBookings) => {
     setBookings(updatedBookings);
@@ -164,6 +265,33 @@ const BookingsLog = () => {
     const updated = bookings.map(b =>
       b.id === id ? { ...b, completed: !b.completed } : b
     );
+    updateBookings(updated);
+  };
+
+  const deleteBooking = async (booking) => {
+    const confirmed = window.confirm(`Delete "${booking.name}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    const updated = bookings.filter(b => b.id !== booking.id);
+
+    if (supabaseEnabled) {
+      setBookings(updated);
+      setSyncStatus('Deleting...');
+      try {
+        const { error } = await supabase
+          .from(SUPABASE_TABLE)
+          .delete()
+          .eq('id', String(booking.id));
+        if (error) throw error;
+        setSyncStatus('Deleted');
+      } catch (err) {
+        console.error('Failed to delete booking from Supabase:', err);
+        setSyncStatus('Delete failed');
+        await loadBookings();
+      }
+      return;
+    }
+
     updateBookings(updated);
   };
 
@@ -277,16 +405,109 @@ const BookingsLog = () => {
     return allComplete && !b.completed;
   }).length;
 
+  if (view === 'honeybook') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#f8f4ee] via-white to-[#f1ebe1]">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-2xl bg-[#886c44] text-white flex items-center justify-center text-lg font-semibold shadow-sm">
+                HB
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-[#886c44]">Voicemails</p>
+                <h1 className="text-3xl font-bold font-cardo text-[#2b251a]">Honeybook Messages</h1>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setView('bookings')}
+                className="px-4 py-2 rounded-md text-sm bg-[#2b251a] text-white hover:bg-[#3a3327] transition-colors"
+              >
+                Back to Bookings
+              </button>
+              <a
+                href={HONEYBOOK_MESSAGES_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 rounded-md text-sm bg-white text-[#2b251a] border border-[#e4d9c7] hover:bg-[#f6efe5] transition-colors"
+              >
+                Open in Google Sheets
+              </a>
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+            <div className="bg-white rounded-2xl shadow-sm border border-[#eadfce] overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[#f0e5d6] bg-gradient-to-r from-[#fffaf3] to-white">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.25em] text-[#886c44]">Live Sheet</p>
+                  <p className="text-sm text-[#5b4f3b]">This view updates automatically.</p>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs bg-[#f6efe5] text-[#6d5b3f] border border-[#eadfce]">
+                  Public
+                </span>
+              </div>
+              <iframe
+                title="Honeybook Messages"
+                src={HONEYBOOK_MESSAGES_EMBED_URL}
+                className="w-full h-[70vh] md:h-[80vh] border-0"
+              />
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-[#eadfce] p-5">
+              <h2 className="text-lg font-semibold text-[#2b251a] mb-2">Quick Notes</h2>
+              <p className="text-sm text-[#5b4f3b] mb-4">
+                Use this page for inbound messages, voicemails, and follow-ups. Keep the sheet
+                tidy so the status stays clear at a glance.
+              </p>
+              <div className="space-y-3 text-sm text-[#5b4f3b]">
+                <div className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-[#886c44]"></span>
+                  <p>Update status after each call-back.</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-[#886c44]"></span>
+                  <p>Tag urgent messages in the notes column.</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-[#886c44]"></span>
+                  <p>Open the full sheet for edits or sorting.</p>
+                </div>
+              </div>
+              <div className="mt-5 rounded-xl border border-[#f0e5d6] bg-[#fffaf3] p-4">
+                <p className="text-xs uppercase tracking-[0.25em] text-[#886c44] mb-1">Tip</p>
+                <p className="text-sm text-[#5b4f3b]">
+                  Use Ctrl+F on the sheet to jump to a name fast.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8 flex justify-between items-start">
+        <div className="mb-8 flex flex-wrap justify-between items-start gap-4">
           <div>
             <h1 className="text-3xl font-bold mb-2 font-cardo text-[#886c44]">North Star House</h1>
             <p className="text-stone-600">Bookings Log</p>
           </div>
           <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2 text-xs text-stone-500">
+              <span className="font-medium uppercase tracking-wide">Voicemails</span>
+              <button
+                onClick={() => setView('honeybook')}
+                className="px-3 py-1 rounded-md text-xs bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                title="Open Honeybook Messages"
+              >
+                Honeybook Messages
+              </button>
+            </div>
             <span className={`text-xs px-2 py-1 rounded ${
               syncStatus === 'Saved' || syncStatus === 'Synced' ? 'bg-green-100 text-green-700' :
               syncStatus === 'Saving...' || syncStatus === 'Loading...' ? 'bg-yellow-100 text-yellow-700' :
@@ -299,17 +520,27 @@ const BookingsLog = () => {
               onClick={loadBookings}
               disabled={loading}
               className="p-2 rounded-md bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:opacity-50"
-              title="Refresh from Google Sheets"
+              title={`Refresh from ${dataSourceLabel}`}
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
-              onClick={() => saveAllToSheet(bookings)}
+              onClick={() => saveAll(bookings)}
               disabled={saving}
               className="p-2 rounded-md bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:opacity-50"
-              title="Save to Google Sheets"
+              title={`Save to ${dataSourceLabel}`}
             >
               <Save className={`w-4 h-4 ${saving ? 'animate-pulse' : ''}`} />
+            </button>
+          </div>
+          <div className="flex md:hidden items-center gap-2 text-xs text-stone-500">
+            <span className="font-medium uppercase tracking-wide">Voicemails</span>
+            <button
+              onClick={() => setView('honeybook')}
+              className="px-3 py-1 rounded-md text-xs bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+              title="Open Honeybook Messages"
+            >
+              Honeybook Messages
             </button>
           </div>
         </div>
@@ -441,7 +672,7 @@ const BookingsLog = () => {
         {/* Loading state */}
         {loading && (
           <div className="text-center py-12 text-stone-500">
-            Loading bookings from Google Sheets...
+            Loading bookings from {dataSourceLabel}...
           </div>
         )}
 
@@ -479,6 +710,15 @@ const BookingsLog = () => {
                     <span className="px-3 py-1 bg-white rounded-full text-xs font-medium text-stone-700 border border-stone-300">
                       {booking.type}
                     </span>
+                    {booking.completed && (
+                      <button
+                        onClick={() => deleteBooking(booking)}
+                        className="p-2 rounded-md bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                        title="Delete booking"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => toggleCompleted(booking.id)}
                       className={`p-2 rounded-md transition-colors ${

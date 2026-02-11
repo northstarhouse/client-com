@@ -360,6 +360,24 @@ const BookingsLog = () => {
     return true;
   }).sort((a, b) => parseDate(a.date) - parseDate(b.date));
 
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  const preEventBookings = filteredBookings.filter((b) => {
+    const eventDate = parseDate(b.date);
+    return Number.isNaN(eventDate.getTime()) || eventDate >= todayMidnight;
+  });
+  const postEventBookings = filteredBookings.filter((b) => {
+    const eventDate = parseDate(b.date);
+    return !Number.isNaN(eventDate.getTime()) && eventDate < todayMidnight;
+  });
+  const showSplit = filter === 'active';
+  const orderedBookings = showSplit
+    ? [...preEventBookings, ...postEventBookings]
+    : filteredBookings;
+  let preHeaderShown = false;
+  let postHeaderShown = false;
+
   const getTypeColor = (type) => {
     switch(type) {
       case 'Wedding': return 'bg-amber-50';
@@ -679,8 +697,37 @@ const BookingsLog = () => {
         {/* Bookings Grid */}
         {!loading && (
           <div className="grid gap-6">
-            {filteredBookings.map(booking => (
-              <div
+            {orderedBookings.map((booking) => {
+              const eventDate = parseDate(booking.date);
+              const isPostEvent = eventDate < todayMidnight;
+              const elements = [];
+
+              if (showSplit && !preHeaderShown && !isPostEvent) {
+                preHeaderShown = true;
+                elements.push(
+                  <div key="pre-event-header" className="flex items-center justify-between mb-2">
+                    <h2 className="text-base font-semibold text-stone-700">Pre-Event</h2>
+                    <span className="text-xs px-2 py-1 rounded-full bg-stone-100 text-stone-600">
+                      {preEventBookings.length} items
+                    </span>
+                  </div>
+                );
+              }
+
+              if (showSplit && !postHeaderShown && isPostEvent) {
+                postHeaderShown = true;
+                elements.push(
+                  <div key="post-event-header" className="flex items-center justify-between mb-2 mt-4">
+                    <h2 className="text-base font-semibold text-stone-700">Post-Event</h2>
+                    <span className="text-xs px-2 py-1 rounded-full bg-stone-100 text-stone-600">
+                      {postEventBookings.length} items
+                    </span>
+                  </div>
+                );
+              }
+
+              elements.push(
+                <div
                 key={booking.id}
                 className={`bg-white rounded-lg shadow-sm p-6 transition-all hover:shadow-md ${getTypeColor(booking.type)} ${booking.completed ? 'opacity-60' : ''}`}
                 style={{ borderWidth: '2px', borderStyle: 'solid', borderColor: getTypeBorderColor(booking.type) }}
@@ -880,7 +927,10 @@ const BookingsLog = () => {
                   )}
                 </div>
               </div>
-            ))}
+              );
+
+              return elements;
+            })}
           </div>
         )}
 

@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local assistant artifacts
+.claude/
+temp_*
+*temp_b64*
+*temp_donor_db*
+nul
